@@ -9,14 +9,15 @@ export default function ChatroomPage() {
   const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [userData, setUserData] = useState(null); // Store full user data
+  const [userData, setUserData] = useState(null); 
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isConnected, setIsConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState({}); // Track online users
   const messagesEndRef = useRef(null);
   const messageContainerRef = useRef(null);
-  const socketRef = useRef(null); // Use ref for socket
+  const socketRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -121,6 +122,14 @@ export default function ChatroomPage() {
       console.log('Connected to WebSocket server');
       setIsConnected(true);
       setError('');
+      
+      // When connected, notify the server about this user's presence
+      if (userData && userData._id) {
+        socketRef.current.emit('userConnected', {
+          userId: userData._id,
+          email: username || 'User'
+        });
+      }
     });
 
     socketRef.current.on('disconnect', () => {
@@ -129,6 +138,24 @@ export default function ChatroomPage() {
 
     socketRef.current.on('connect_error', () => {
       setError('Failed to connect to chat server');
+    });
+
+    // Listen for online users updates
+    socketRef.current.on('onlineUsers', (users) => {
+      console.log('Online users:', users);
+      setOnlineUsers(users);
+    });
+
+    // Listen for user disconnect events
+    socketRef.current.on('userDisconnected', (userId) => {
+      setOnlineUsers(prev => {
+        const updated = {...prev};
+        if (updated[userId]) {
+          updated[userId].online = false;
+          updated[userId].lastSeen = new Date().toISOString();
+        }
+        return updated;
+      });
     });
 
     socketRef.current.on('newMessage', (message) => {
@@ -241,29 +268,42 @@ export default function ChatroomPage() {
     return msg.user?.email === username;
   };
 
+  // Format timestamp to readable time
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  // Format last seen time
+  const formatLastSeen = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    const now = new Date();
+    const lastSeen = new Date(timestamp);
+    const diffInSeconds = Math.floor((now - lastSeen) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'Just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+    } else {
+      return lastSeen.toLocaleDateString([], { 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
   };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Navbar />
       
-      {/* Debug Info Button - Helps you troubleshoot */}
-      <div className="bg-gray-100 border-gray-300 border p-2 m-2 rounded">
-        <details>
-          <summary className="cursor-pointer text-gray-600 font-medium">Debug Info</summary>
-          <div className="pt-2 text-sm">
-            <p>Socket Connected: {isConnected ? 'Yes' : 'No'}</p>
-            <p>Username: {username || 'Not set'}</p>
-            <p>User ID: {userData?._id || 'Not set'}</p>
-            <p>Messages: {messages.length}</p>
-          </div>
-        </details>
-      </div>
-
       {!isConnected && (
         <div className="bg-yellow-100 border-yellow-400 border-l-4 p-4 flex items-center">
           <AlertCircle size={20} className="text-yellow-600 mr-2" />
@@ -277,78 +317,118 @@ export default function ChatroomPage() {
           <p className="text-red-700">{error}</p>
         </div>
       )}
-
-      <div 
-        ref={messageContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-3"
-      >
-        {isLoading ? (
-          <div className="flex justify-center items-center h-full">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      
+      {/* Main chat area */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Online users sidebar */}
+        <div className="hidden md:block w-64 bg-white border-r border-gray-200 shadow-sm">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="font-semibold text-gray-700">Online Users</h2>
           </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <MessageCircle size={48} className="mb-4 text-gray-400" />
-            <p className="text-center">No messages yet. Start the conversation!</p>
+          <div className="p-2">
+            {Object.keys(onlineUsers).length === 0 ? (
+              <p className="text-sm text-gray-500 p-2">No users online</p>
+            ) : (
+              <ul className="space-y-1">
+                {Object.entries(onlineUsers).map(([userId, user]) => (
+                  <li key={userId} className="p-2 hover:bg-gray-50 rounded flex items-center">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${user.online ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="text-sm font-medium text-gray-700 truncate">{user.email}</p>
+                      {!user.online && (
+                        <p className="text-xs text-gray-500">Last seen: {formatLastSeen(user.lastSeen)}</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        ) : (
-          messages.map((msg, index) => {
-            const isUser = isCurrentUser(msg);
-            return (
-              <div 
-                key={index} 
-                className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
-              >
-                <div 
-                  className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-lg ${
-                    isUser 
-                      ? 'bg-blue-600 text-white rounded-br-none' 
-                      : 'bg-white text-gray-800 border rounded-bl-none shadow'
-                  }`}
-                >
-                  {!isUser && (
-                    <p className="text-sm font-medium text-gray-600 mb-1">
-                      {msg.user?.email || 'Unknown User'}
-                    </p>
-                  )}
-                  <p className="break-words">{msg.text}</p>
-                  <p 
-                    className={`text-xs text-right mt-1 ${
-                      isUser ? 'text-blue-200' : 'text-gray-400'
-                    }`}
-                  >
-                    {msg.createdAt ? formatTime(msg.createdAt) : ''}
-                  </p>
-                </div>
+        </div>
+        
+        {/* Messages area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div 
+            ref={messageContainerRef}
+            className="flex-1 overflow-y-auto p-4 space-y-3"
+          >
+            {isLoading ? (
+              <div className="flex justify-center items-center h-full">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+            ) : messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <MessageCircle size={48} className="mb-4 text-gray-400" />
+                <p className="text-center">No messages yet. Start the conversation!</p>
+              </div>
+            ) : (
+              messages.map((msg, index) => {
+                const isUser = isCurrentUser(msg);
+                const userEmail = msg.user?.email || (isUser ? (username || 'You') : 'Unknown User');
+                const userStatus = msg.user && onlineUsers[msg.user._id] 
+                  ? onlineUsers[msg.user._id].online ? 'online' : 'offline'
+                  : 'unknown';
+                
+                return (
+                  <div 
+                    key={index} 
+                    className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`}
+                  >
+                    <div 
+                      className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-lg ${
+                        isUser 
+                          ? 'bg-blue-600 text-white rounded-br-none' 
+                          : 'bg-white text-gray-800 border rounded-bl-none shadow'
+                      }`}
+                    >
+                      {!isUser && (
+                        <div className="flex items-center mb-1">
+                          <span className="text-sm font-medium text-gray-700">{userEmail}</span>
+                          <span className={`ml-2 w-2 h-2 rounded-full ${
+                            userStatus === 'online' ? 'bg-green-500' : 'bg-gray-300'
+                          }`}></span>
+                        </div>
+                      )}
+                      <p className="break-words text-sm">{msg.text}</p>
+                      <p 
+                        className={`text-xs text-right mt-1 ${
+                          isUser ? 'text-blue-200' : 'text-gray-400'
+                        }`}
+                      >
+                        {msg.createdAt ? formatTime(msg.createdAt) : ''}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-      <form onSubmit={sendMessage} className="flex items-center p-4 bg-white border-t shadow-sm">
-        <button 
-          type="button"
-          className="p-2 text-gray-500 hover:text-gray-700 rounded-full"
-        >
-          <Smile size={20} />
-        </button>
-        <input 
-          type="text"
-          placeholder="Type your message..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          className="flex-1 p-3 mx-2 bg-gray-100 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button 
-          type="submit" 
-          disabled={!isConnected || newMessage.trim() === ''}
-          className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-        >
-          <Send size={20} />
-        </button>
-      </form>
+          <form onSubmit={sendMessage} className="flex items-center p-4 bg-white border-t shadow-sm">
+            <button 
+              type="button"
+              className="p-2 text-gray-500 hover:text-gray-700 rounded-full"
+            >
+              <Smile size={20} />
+            </button>
+            <input 
+              type="text"
+              placeholder="Type your message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="flex-1 p-3 mx-2 bg-gray-100 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 placeholder-gray-500"
+            />
+            <button 
+              type="submit" 
+              disabled={!isConnected || newMessage.trim() === ''}
+              className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+            >
+              <Send size={20} />
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

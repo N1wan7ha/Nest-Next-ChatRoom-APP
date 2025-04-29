@@ -25,7 +25,7 @@ export default function Navbar() {
           {/* Desktop menu */}
           <div className="hidden md:flex items-center space-x-4">
             <button 
-              onClick={() => router.push('/profile')}
+              onClick={() => router.push('#')}
               className="flex items-center px-3 py-2 rounded hover:bg-blue-700 transition-colors"
             >
               <User size={18} className="mr-2" />
@@ -58,7 +58,7 @@ export default function Navbar() {
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-blue-700">
             <button
               onClick={() => {
-                router.push('/profile');
+                router.push('#');
                 setShowMenu(false);
               }}
               className="flex items-center w-full px-3 py-2 rounded hover:bg-blue-800 transition-colors"
