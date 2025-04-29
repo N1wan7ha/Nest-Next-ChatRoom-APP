@@ -4,6 +4,6 @@ export declare class MessageController {
     constructor(messageService: MessageService);
     create(body: {
         text: string;
-    }, req: any): Promise<any>;
-    findAll(): Promise<any>;
+    }, req: any): Promise<import("./message.schema").Message>;
+    findAll(): Promise<import("./message.schema").Message[]>;
 }

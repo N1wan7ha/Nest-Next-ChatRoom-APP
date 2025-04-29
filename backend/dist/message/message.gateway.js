@@ -11,7 +11,6 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessageGateway = void 0;
 const websockets_1 = require("@nestjs/websockets");
@@ -38,7 +37,7 @@ let MessageGateway = class MessageGateway {
 exports.MessageGateway = MessageGateway;
 __decorate([
     (0, websockets_1.WebSocketServer)(),
-    __metadata("design:type", typeof (_b = typeof socket_io_1.Server !== "undefined" && socket_io_1.Server) === "function" ? _b : Object)
+    __metadata("design:type", socket_io_1.Server)
 ], MessageGateway.prototype, "server", void 0);
 __decorate([
     (0, websockets_1.SubscribeMessage)('sendMessage'),
@@ -53,6 +52,6 @@ exports.MessageGateway = MessageGateway = __decorate([
             origin: '*',
         },
     }),
-    __metadata("design:paramtypes", [typeof (_a = typeof message_service_1.MessageService !== "undefined" && message_service_1.MessageService) === "function" ? _a : Object])
+    __metadata("design:paramtypes", [message_service_1.MessageService])
 ], MessageGateway);
 //# sourceMappingURL=message.gateway.js.map

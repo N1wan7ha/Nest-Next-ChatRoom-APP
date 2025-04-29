@@ -5,9 +5,13 @@ export declare class AuthController {
     register(body: {
         email: string;
         password: string;
-    }): Promise<any>;
+    }): Promise<import("../user/user.schema").User>;
     login(body: {
         email: string;
         password: string;
-    }): Promise<any>;
+    }): Promise<{
+        access_token: string;
+    } | {
+        message: string;
+    }>;
 }
