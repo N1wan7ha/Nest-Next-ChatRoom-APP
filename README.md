@@ -4,7 +4,7 @@
 [![NestJS](https://img.shields.io/badge/NestJS-10.0.0-E0234E?logo=nestjs)](https://nestjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-7.0-47A248?logo=mongodb)](https://www.mongodb.com/)
 
-A full-stack real-time chat application built with **Next.js**, **NestJS**, and **MongoDB Atlas** for an internship assessment.
+A full-stack real-time chat application built with **Next.js**, **NestJS**, and **MongoDB Atlas**.
 
 👉 **Live Demo**: [Coming Soon]  
 📂 **GitHub Repository**: [https://github.com/N1wan7ha/Ne-s-x-t-ChatRoom-App](https://github.com/N1wan7ha/Ne-s-x-t-ChatRoom-App)
